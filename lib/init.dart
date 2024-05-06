@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
-import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'package:laica_mobile/environments.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -42,7 +41,7 @@ class _InitState extends State<Init> {
         ),
       );
     } else {
-      bool hasConnection = await InternetConnectionChecker().hasConnection;
+      bool hasConnection = await checkInternetConnectivityPing();
       if (hasConnection == false) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

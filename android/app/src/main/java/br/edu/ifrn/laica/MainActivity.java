@@ -1,4 +1,4 @@
-package com.example.laica_mobile;
+package br.edu.ifrn.laica;
 
 import io.flutter.embedding.android.FlutterActivity;
 

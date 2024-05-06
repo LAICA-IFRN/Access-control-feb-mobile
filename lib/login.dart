@@ -1,7 +1,5 @@
 import 'dart:async';
-
 import 'package:flutter/services.dart';
-import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'package:laica_mobile/environments.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -21,11 +19,16 @@ class _Login extends State {
   final storage = const FlutterSecureStorage();
 
   static const homeText = 'Controle de acesso';
-  static const userHintText = 'Matrícula ou CPF';
+  static const userHintText = 'Documento';
   static const passwordHintText = 'Senha';
   static const primaryColor = 0xFFED2F59;
+  var _showPassword = true;
+  var _loginFailFeedback = false;
+  var _loginFailStatusCode = 0;
 
   var accessFailSnackBar = SnackBar(content: Text('Falha na comunicação com o sistema, tente novamente mais tarde'), duration: Duration(seconds: 4), backgroundColor: Colors.red.shade400);
+  var userNotFoundSnackBar = SnackBar(content: Text('Usuário não encontrado, digitou o documento correto?'), duration: Duration(seconds: 4), backgroundColor: Colors.red.shade400);
+  var invalidPasswordSnackBar = SnackBar(content: Text('Senha incorreta, tente novamente'), duration: Duration(seconds: 4), backgroundColor: Colors.red.shade400);
 
   Future<bool> _login(String document, String password) async {
     try {
@@ -39,7 +42,12 @@ class _Login extends State {
       } else {
         return false;
       }
+    } on CreateTokenException catch (e) {
+      _loginFailStatusCode = e.message;
+      _loginFailFeedback = true;
+      return false;
     } catch (e) {
+      // print(e);
       return false;
     }
   }
@@ -52,10 +60,10 @@ class _Login extends State {
           child: Column(
             children: <Widget>[
               Container(
-                margin: const EdgeInsets.symmetric(horizontal: 60, vertical: 55),
+                margin: const EdgeInsets.only(top: 50, bottom: 10),
                 child: const Image(
                   image: AssetImage('assets/images/logo-init.png'),
-                  height: 180,
+                  height: 150,
                 ),
               ),
               const Text(
@@ -68,10 +76,12 @@ class _Login extends State {
                 ),
               ),
               Container(
-                margin: const EdgeInsets.only(top: 40, left: 20, right: 20),
+                margin: const EdgeInsets.only(top: 50, left: 20, right: 20),
+                width: MediaQuery.of(context).size.width * 0.8,
                 child: TextField(
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.all(15),
                       hintText: userHintText,
                       focusColor: const Color(primaryColor),
                       enabledBorder: OutlineInputBorder(
@@ -92,36 +102,69 @@ class _Login extends State {
               ),
               Container(
                 margin: const EdgeInsets.only(top: 10, left: 20, right: 20),
-                child: TextField(
-                  obscureText: true,
-                  decoration: InputDecoration(
-                      hintText: passwordHintText,
-                      focusColor: const Color(primaryColor),
-                      enabledBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(color: Color(0xFF868686), width: 2, style: BorderStyle.solid),
-                          borderRadius: BorderRadius.circular(25.0)
+                width: MediaQuery.of(context).size.width * 0.8,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        obscureText: _showPassword,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.all(15),
+                          hintText: passwordHintText,
+                          focusColor: const Color(primaryColor),
+                          enabledBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Color(0xFF868686), width: 2, style: BorderStyle.solid),
+                              borderRadius: BorderRadius.circular(25.0)
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Color(0xFF868686), width: 2, style: BorderStyle.solid),
+                              borderRadius: BorderRadius.circular(25.0)
+                          ),
+                        ),
+                        onChanged: (text) {
+                          setState(() {
+                            password = text;
+                          });
+                        },
                       ),
-                      focusedBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(color: Color(0xFF868686), width: 2, style: BorderStyle.solid),
-                          borderRadius: BorderRadius.circular(25.0)
-                      )
-                  ),
-                  onChanged: (text) {
-                    setState(() {
-                      password = text;
-                    });
-                  },
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        _showPassword ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _showPassword = !_showPassword;
+                        });
+                      },
+                    ),
+                  ],
                 ),
               ),
               Container(
                 margin: const EdgeInsets.only(top: 25, left: 20, right: 20),
+                width: MediaQuery.of(context).size.width * 0.5,
                 child: TextButton(
                   style: ButtonStyle(
                     backgroundColor: MaterialStateProperty.all<Color>(const Color(primaryColor)),
-                    padding: MaterialStateProperty.all<EdgeInsetsGeometry>(const EdgeInsets.symmetric(horizontal: 65, vertical: 20)),
+                    padding: MaterialStateProperty.all<EdgeInsetsGeometry>(const EdgeInsets.symmetric(horizontal: 50, vertical: 10)),
                   ),
                   onPressed: () async {
                     bool hasLoggedIn = await _login(document, password);
+
+                    if (_loginFailFeedback) {
+                      if (_loginFailStatusCode == 401) {
+                        ScaffoldMessenger.of(context).showSnackBar(invalidPasswordSnackBar);
+                        _loginFailFeedback = false;
+                        _loginFailStatusCode = 0;
+                      } else if (_loginFailStatusCode == 404) {
+                        ScaffoldMessenger.of(context).showSnackBar(userNotFoundSnackBar);
+                        _loginFailFeedback = false;
+                        _loginFailStatusCode = 0;
+                      }
+                      return;
+                    }
 
                     if (hasLoggedIn) {
                       Navigator.of(context).push(
@@ -130,7 +173,7 @@ class _Login extends State {
                         ),
                       );
                     } else {
-                      bool hasConnection = await InternetConnectionChecker().hasConnection;
+                      bool hasConnection = await checkInternetConnectivityPing();
                       if (hasConnection == true) {
                         ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(

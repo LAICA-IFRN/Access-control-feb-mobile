@@ -1,6 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+
+class CreateTokenException implements Exception {
+  final int message;
+
+  CreateTokenException(this.message);
+}
+
 
 class Token {
   final String jwt;
@@ -34,6 +42,7 @@ Future<String> registration(String token) async {
   }
 }
 
+
 Future<Token> createToken(String document, String password) async {
   const storage = FlutterSecureStorage();
 
@@ -45,7 +54,6 @@ Future<Token> createToken(String document, String password) async {
   }
 
   final uri = Uri.parse('http://laica.ifrn.edu.br/access-control/gateway/tokenize/mobile');
-
   final response = await http.post(uri, body: body);
 
   if (response.statusCode == 201) {
@@ -56,7 +64,7 @@ Future<Token> createToken(String document, String password) async {
     }
     return Token.fromJson(json as Map<String, dynamic>);
   } else {
-    throw Exception('Failed to create token.');
+    throw CreateTokenException(response.statusCode);
   }
 }
 
@@ -73,6 +81,19 @@ Future<bool?> verifyToken(String? token) async {
       return false;
     }
   } else {
+    return false;
+  }
+}
+
+Future<bool> checkInternetConnectivityPing() async {
+  try {
+    var result = await Process.run('ping', ['-c', '1', 'google.com']);
+    if (result.exitCode == 0) {
+      return true;
+    }
+    return false;
+  } on Exception catch (e) {
+    // print("Exception: ${e}");
     return false;
   }
 }
